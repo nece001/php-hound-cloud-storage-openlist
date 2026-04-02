@@ -8,7 +8,7 @@ namespace Nece\Hound\Cloud\Storage;
  * @author nece001@163.com
  * @create 2026-03-29 21:36:24
  */
-class OpenList implements IStorage
+class OpenList extends Storage implements IStorage
 {
     /**
      * OpenList客户端
@@ -113,7 +113,8 @@ class OpenList implements IStorage
             $from_dir = dirname($from);
             $to_dir = dirname($to);
         } else {
-            $names = $this->scandir($from);
+            $list = $this->list($from);
+            $names = array_column($list, 'name');
             $from_dir = $from;
             $to_dir = $to;
         }
@@ -153,7 +154,8 @@ class OpenList implements IStorage
             $from_dir = dirname($from);
             $to_dir = dirname($to);
         } else {
-            $names = $this->scandir($from);
+            $list = $this->list($from);
+            $names = array_column($list, 'name');
             $from_dir = $from;
             $to_dir = $to;
         }
@@ -228,7 +230,7 @@ class OpenList implements IStorage
     /**
      * @inheritDoc
      */
-    public function scandir(string $path, int $order = Consts::SCANDIR_SORT_ASCENDING, $page = 1, $per_page = 100): array
+    public function list(string $path, int $order = Consts::SCANDIR_SORT_ASCENDING, $page = 1, $per_page = 100): array
     {
         $directory = $this->fullPath($path);
 
@@ -247,7 +249,15 @@ class OpenList implements IStorage
             $data = $this->client->jsonPost($api, $body);
             if (isset($data['content']) && $data['content']) {
                 foreach ($data['content'] as $row) {
-                    $list[] = $row['name'];
+
+                    $name = $row['name'];
+                    $size = $row['size'];
+                    $is_dir = $row['is_dir'];
+                    $ctime = strtotime($row['created']);
+                    $mtime = strtotime($row['modified']);
+                    $atime = $mtime;
+
+                    $list[] = $this->buildObjectListItem($name, $size, $is_dir, $ctime, $mtime, $atime);
                 }
             }
         } catch (StorageException $e) {
@@ -291,7 +301,8 @@ class OpenList implements IStorage
                     mkdir($local_dst, 0755, true);
                 }
 
-                $files = $this->scandir($src);
+                $list = $this->list($src);
+                $files = array_column($list, 'name');
                 foreach ($files as $file) {
                     $path =  $src . '/' . $file;
                     $dir = $local_dst . DIRECTORY_SEPARATOR . $file;
